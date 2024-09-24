@@ -8,6 +8,8 @@ const path = require("path");
 const axios = require("axios");
 const cors = require("cors");
 const bodyParser = require("body-parser");
+const util = require("util");
+const unlinkAsync = util.promisify(fs.unlink);
 
 // Set ffmpeg path
 ffmpeg.setFfmpegPath(ffmpegStatic);
@@ -19,45 +21,66 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, "../client/public")));
+app.use("/videos", express.static(path.join(__dirname, "public")));
 
 const upload = multer({ dest: "uploads/" });
 
 app.post("/upload", upload.single("video"), async (req, res) => {
   try {
+    console.log("Received video upload request");
     const videoPath = req.file.path;
     const audioPath = path.join("uploads", `${req.file.filename}.wav`);
 
-    // Extract audio from video
+    console.log("Extracting audio from video");
     await extractAudio(videoPath, audioPath);
 
-    // Perform speech-to-text
+    console.log("Performing speech-to-text");
     const text = await speechToText(audioPath);
 
-    // Translate text
+    console.log("Translating text");
     const translatedText = await translateText(text);
 
-    // Generate new speech with voice cloning
+    console.log("Generating new speech with voice cloning");
     const clonedAudioPath = await textToSpeechWithCloning(translatedText);
 
-    // Sync new audio with original video
-    const outputPath = path.join("public", `${req.file.filename}_dubbed.mp4`);
+    console.log("Syncing new audio with original video");
+    const outputFileName = `${Date.now()}_dubbed.mp4`;
+    const outputPath = path.join("public", outputFileName);
     await syncAudioWithVideo(videoPath, clonedAudioPath, outputPath);
 
-    res.json({ success: true, videoUrl: `/${path.basename(outputPath)}` });
+    console.log("Processing completed successfully");
+    res.json({ success: true, videoUrl: `/videos/${outputFileName}` });
+
+    // Clean up temporary files
+    await cleanupTempFiles(videoPath, audioPath, clonedAudioPath);
   } catch (error) {
-    console.error(error);
+    console.error("Error during video processing:", error);
     res.status(500).json({ success: false, error: error.message });
+
+    // Attempt to clean up even if there was an error
+    try {
+      await cleanupTempFiles(videoPath, audioPath, clonedAudioPath);
+    } catch (cleanupError) {
+      console.error("Error during cleanup:", cleanupError);
+    }
   }
 });
 
 function extractAudio(videoPath, audioPath) {
+  console.log(`Extracting audio from ${videoPath} to ${audioPath}`);
   return new Promise((resolve, reject) => {
     ffmpeg(videoPath)
       .outputOptions("-acodec", "pcm_s16le")
       .outputOptions("-vn")
       .save(audioPath)
-      .on("end", resolve)
-      .on("error", reject);
+      .on("end", () => {
+        console.log("Audio extraction completed");
+        resolve();
+      })
+      .on("error", (err) => {
+        console.error("Error during audio extraction:", err);
+        reject(err);
+      });
   });
 }
 
@@ -90,6 +113,19 @@ function syncAudioWithVideo(videoPath, audioPath, outputPath) {
       .on("end", resolve)
       .on("error", reject);
   });
+}
+
+async function cleanupTempFiles(...filePaths) {
+  for (const filePath of filePaths) {
+    if (filePath && fs.existsSync(filePath)) {
+      try {
+        await unlinkAsync(filePath);
+        console.log(`Deleted temporary file: ${filePath}`);
+      } catch (error) {
+        console.error(`Error deleting file ${filePath}:`, error);
+      }
+    }
+  }
 }
 
 const PORT = process.env.PORT || 3000;
