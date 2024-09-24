@@ -32,7 +32,8 @@ app.post("/upload", upload.single("video"), async (req, res) => {
     console.log("Received video upload request");
     const videoPath = req.file.path;
     const audioPath = path.join("uploads", `${req.file.filename}.wav`);
-    const targetLanguage = req.body.targetLanguage || "es"; // Default to Spanish if not provided
+    const targetLanguage = req.body.targetLanguage || "ES"; // Default to Spanish if not provided
+    console.log("Target language:", targetLanguage);
 
     console.log("Extracting audio from video");
     await extractAudio(videoPath, audioPath);
@@ -157,5 +158,14 @@ async function cleanupTempFiles(...filePaths) {
   }
 }
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+// Serve static files from the React app
+app.use(express.static(path.join(__dirname, "../client/dist")));
+
+// The "catchall" handler: for any request that doesn't
+// match one above, send back React's index.html file.
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "../client/dist/index.html"));
+});

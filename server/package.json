@@ -1,7 +1,6 @@
 {
-  "name": "voice-dubbing-server",
+  "name": "video-dubbing-server",
   "version": "1.0.0",
-  "description": "Backend for voice dubbing application",
   "main": "app.js",
   "scripts": {
     "start": "node app.js",

@@ -3,4 +3,5 @@ node_modules
 uploads
 public
 *.log
+client/dist
 
