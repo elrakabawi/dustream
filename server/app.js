@@ -10,6 +10,7 @@ const cors = require("cors");
 const bodyParser = require("body-parser");
 const util = require("util");
 const unlinkAsync = util.promisify(fs.unlink);
+const { Deepgram, createClient } = require("@deepgram/sdk");
 
 // Set ffmpeg path
 ffmpeg.setFfmpegPath(ffmpegStatic);
@@ -36,9 +37,11 @@ app.post("/upload", upload.single("video"), async (req, res) => {
 
     console.log("Performing speech-to-text");
     const text = await speechToText(audioPath);
+    console.log("Transcription:", text);
 
     console.log("Translating text");
     const translatedText = await translateText(text);
+    console.log("Translated text:", translatedText);
 
     console.log("Generating new speech with voice cloning");
     const clonedAudioPath = await textToSpeechWithCloning(translatedText);
@@ -52,14 +55,14 @@ app.post("/upload", upload.single("video"), async (req, res) => {
     res.json({ success: true, videoUrl: `/videos/${outputFileName}` });
 
     // Clean up temporary files
-    await cleanupTempFiles(videoPath, audioPath, clonedAudioPath);
+    await cleanupTempFiles(videoPath, audioPath);
   } catch (error) {
     console.error("Error during video processing:", error);
     res.status(500).json({ success: false, error: error.message });
 
     // Attempt to clean up even if there was an error
     try {
-      await cleanupTempFiles(videoPath, audioPath, clonedAudioPath);
+      await cleanupTempFiles(videoPath, audioPath);
     } catch (cleanupError) {
       console.error("Error during cleanup:", cleanupError);
     }
@@ -85,9 +88,27 @@ function extractAudio(videoPath, audioPath) {
 }
 
 async function speechToText(audioPath) {
-  // Implement Deepgram or AssemblyAI API call here
-  // For now, we'll return a placeholder text
-  return "This is a placeholder transcription.";
+  console.log("Starting speech-to-text", process.env.DEEPGRAM_API_KEY);
+  const deepgram = createClient(process.env.DEEPGRAM_API_KEY);
+
+  try {
+    console.log(`Transcribing audio file: ${audioPath}`);
+
+    const { result, error } = await deepgram.listen.prerecorded.transcribeFile(fs.readFileSync(audioPath), {
+      model: "nova-2",
+      smart_format: true,
+    });
+
+    if (error) {
+      throw new Error(`Deepgram transcription error: ${error}`);
+    }
+
+    console.log("Transcription completed");
+    return result.results.channels[0].alternatives[0].transcript;
+  } catch (error) {
+    console.error("Error during speech-to-text:", error);
+    throw error;
+  }
 }
 
 async function translateText(text) {
