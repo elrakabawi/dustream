@@ -11,6 +11,7 @@ const bodyParser = require("body-parser");
 const util = require("util");
 const unlinkAsync = util.promisify(fs.unlink);
 const { Deepgram, createClient } = require("@deepgram/sdk");
+const deepl = require("deepl-node");
 
 // Set ffmpeg path
 ffmpeg.setFfmpegPath(ffmpegStatic);
@@ -31,6 +32,7 @@ app.post("/upload", upload.single("video"), async (req, res) => {
     console.log("Received video upload request");
     const videoPath = req.file.path;
     const audioPath = path.join("uploads", `${req.file.filename}.wav`);
+    const targetLanguage = req.body.targetLanguage || "es"; // Default to Spanish if not provided
 
     console.log("Extracting audio from video");
     await extractAudio(videoPath, audioPath);
@@ -40,7 +42,7 @@ app.post("/upload", upload.single("video"), async (req, res) => {
     console.log("Transcription:", text);
 
     console.log("Translating text");
-    const translatedText = await translateText(text);
+    const translatedText = await translateText(text, targetLanguage);
     console.log("Translated text:", translatedText);
 
     console.log("Generating new speech with voice cloning");
@@ -111,10 +113,16 @@ async function speechToText(audioPath) {
   }
 }
 
-async function translateText(text) {
-  // Implement translation API call here
-  // For now, we'll return the same text
-  return text;
+async function translateText(text, targetLanguage) {
+  const translator = new deepl.Translator(process.env.DEEPL_API_KEY);
+
+  try {
+    const result = await translator.translateText(text, null, targetLanguage);
+    return result.text;
+  } catch (error) {
+    console.error("Error during translation:", error);
+    throw error;
+  }
 }
 
 async function textToSpeechWithCloning(text) {
