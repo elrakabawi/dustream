@@ -57,7 +57,7 @@ function App() {
     <div className="min-h-screen bg-gray-100 py-6 flex flex-col justify-center sm:py-12">
       <div className="relative py-3 sm:max-w-xl sm:mx-auto">
         <div className="relative px-4 py-10 bg-white shadow-lg sm:rounded-3xl sm:p-20">
-          <h1 className="text-2xl font-semibold mb-5">Video Dubbing App</h1>
+          <h1 className="text-2xl font-semibold mb-5">Dusync</h1>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700">Select Video</label>
